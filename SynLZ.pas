@@ -5,7 +5,7 @@ unit SynLZ;
 {
     This file is part of Synopse SynLZ Compression.
 
-    Synopse SynLZ Compression. Copyright (C) 2020 Arnaud Bouchez
+    Synopse SynLZ Compression. Copyright (C) 2021 Arnaud Bouchez
       Synopse Informatique - https://synopse.info
 
   *** BEGIN LICENSE BLOCK *****
@@ -24,7 +24,7 @@ unit SynLZ;
 
   The Initial Developer of the Original Code is Arnaud Bouchez.
 
-  Portions created by the Initial Developer are Copyright (C) 2020
+  Portions created by the Initial Developer are Copyright (C) 2021
   the Initial Developer. All Rights Reserved.
 
   Contributor(s):
@@ -175,6 +175,7 @@ end;
 
 type // some cross-platform and cross-compiler definitions
   {$ifndef FPC}
+  PtrInt = {$ifdef CPU64}NativeInt{$else}integer{$endif};
   PtrUInt = {$ifdef CPU64}NativeUInt{$else}cardinal{$endif};
   {$endif}
   {$ifdef DELPHI5OROLDER} // Delphi 5 doesn't have those base types defined :(
@@ -198,6 +199,7 @@ end;
 // using direct x86 jmp also circumvents Internal Error C11715 for Delphi 5
 {$ifdef CPUX86}
 function SynLZcompress1(src: PAnsiChar; size: integer; dst: PAnsiChar): integer;
+  {$ifdef FPC} nostackframe; assembler; {$endif}
 asm
         push    ebp
         push    ebx
@@ -626,13 +628,16 @@ end;
 procedure movechars(s,d: PAnsiChar; t: PtrUInt); {$ifdef HASINLINE}inline;{$endif}
 // fast code for unaligned and overlapping (see {$define WT}) small blocks
 // this code is sometimes used rather than system.move()
+var c: AnsiChar; // better code generation on FPC
 begin
-  dec(PtrUInt(s), PtrUInt(d));
-  inc(t, PtrUInt(d));
+  inc(PtrUInt(s), t);
+  inc(PtrUInt(d), t);
+  PtrInt(t) := -PtrInt(t);
   repeat
-    d^ := s[PtrUInt(d)];
-    inc(d);
-  until PtrUInt(d)=t;
+    c := s[t];
+    d[t] := c;
+    inc(t);
+  until t=0;
 end;
 
 const
@@ -733,6 +738,7 @@ end;
 {$ifdef CPUX86}
 // using direct x86 jmp also circumvents Internal Error C11715 for Delphi 5
 function SynLZdecompress1(src: PAnsiChar; size: integer; dst: PAnsiChar): integer;
+  {$ifdef FPC} nostackframe; assembler; {$endif}
 asm
         push    ebp
         push    ebx
